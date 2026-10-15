@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: 'postgres:17'
+    environment:
+      - 'POSTGRES_DB=ticket_triage'
+      - 'POSTGRES_USER=ticket_triage'
+      - 'POSTGRES_PASSWORD=local-dev-only'
+    ports:
+      - '5432'

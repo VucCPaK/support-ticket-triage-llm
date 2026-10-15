@@ -1,0 +1,22 @@
+spring:
+  application.name: ticket-triage
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate  # Flyway owns the schema, Hibernate only checks entities against it
+
+  flyway:
+    clean-disabled: true
+
+  mvc:
+    problemdetails:
+      enabled: true  # validation and framework errors as RFC 9457 ProblemDetail
+
+  # Local dev: OPENAI_API_KEY=... in .env (gitignored). Prod: the same name as a real environment variable.
+  config:
+    import: optional:file:.env[.properties]
+
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
