@@ -27,12 +27,12 @@ public class TicketController {
 
     @PostMapping
     public ResponseEntity<TicketResponse> create(@Valid @RequestBody CreateTicketRequest request) {
-        Ticket ticket = ticketService.create(request);
+        TicketDetails details = ticketService.create(request);
         URI location = ServletUriComponentsBuilder.fromCurrentRequest()
                 .path("/{id}")
-                .buildAndExpand(ticket.getId())
+                .buildAndExpand(details.ticket().getId())
                 .toUri();
-        return ResponseEntity.created(location).body(TicketResponse.from(ticket));
+        return ResponseEntity.created(location).body(TicketResponse.from(details));
     }
 
     @GetMapping("/{id}")

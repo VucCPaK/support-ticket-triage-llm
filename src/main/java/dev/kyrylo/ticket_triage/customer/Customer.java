@@ -6,12 +6,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "customers")
+@Getter
 public class Customer {
 
     @Id
@@ -32,25 +34,5 @@ public class Customer {
 
     protected Customer() {
         // for JPA
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getName() {
-        return name;
-    }
-
-    public CustomerPlan getPlan() {
-        return plan;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

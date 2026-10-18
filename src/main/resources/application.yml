@@ -20,3 +20,18 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
+      timeout: 30s
+      max-retries: 2
+      chat:
+        model: gpt-6-luna
+
+llm:
+  triage:
+    prompt-version: 1
+  pricing:            # USD per 1M tokens, checked 2026-10-03
+    "[gpt-6-luna]":
+      input: 0.10
+      output: 0.50
+    "[gpt-6.1-sol]":
+      input: 2.00
+      output: 10.00

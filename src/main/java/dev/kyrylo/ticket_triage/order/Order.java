@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -17,7 +18,8 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "orders")  // ORDER is a reserved word in SQL
+@Table(name = "orders") // ORDER is a reserved word in SQL
+@Getter
 public class Order {
 
     @Id
@@ -47,37 +49,5 @@ public class Order {
 
     protected Order() {
         // for JPA
-    }
-
-    public UUID getId() {
-        return id;
-    }
-
-    public String getOrderNumber() {
-        return orderNumber;
-    }
-
-    public Customer getCustomer() {
-        return customer;
-    }
-
-    public OrderStatus getStatus() {
-        return status;
-    }
-
-    public BigDecimal getTotalAmount() {
-        return totalAmount;
-    }
-
-    public String getCurrency() {
-        return currency;
-    }
-
-    public LocalDate getEta() {
-        return eta;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
     }
 }

@@ -6,12 +6,14 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.Getter;
 
 import java.time.Instant;
 import java.util.UUID;
 
 @Entity
 @Table(name = "tickets")
+@Getter
 public class Ticket {
 
     @Id
@@ -50,27 +52,19 @@ public class Ticket {
         return new Ticket(customerEmail, subject, body, now);
     }
 
-    public UUID getId() {
-        return id;
+    public void markTriaged() {
+        requireStatus(TicketStatus.NEW);
+        this.status = TicketStatus.TRIAGED;
     }
 
-    public String getCustomerEmail() {
-        return customerEmail;
+    public void markTriageFailed() {
+        requireStatus(TicketStatus.NEW);
+        this.status = TicketStatus.TRIAGE_FAILED;
     }
 
-    public String getSubject() {
-        return subject;
-    }
-
-    public String getBody() {
-        return body;
-    }
-
-    public TicketStatus getStatus() {
-        return status;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
+    private void requireStatus(TicketStatus expected) {
+        if (status != expected) {
+            throw new IllegalStateException("Ticket " + id + " is " + status + ", expected " + expected);
+        }
     }
 }
