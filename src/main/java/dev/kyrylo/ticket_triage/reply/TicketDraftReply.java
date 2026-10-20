@@ -43,6 +43,9 @@ public class TicketDraftReply {
     @Column(name = "latency_ms", nullable = false)
     private Integer latencyMs;
 
+    @Column(name = "tool_calls", nullable = false)
+    private Integer toolCalls;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
@@ -65,6 +68,7 @@ public class TicketDraftReply {
         this.outputTokens = reply.metrics().outputTokens();
         this.reasoningTokens = reply.metrics().reasoningTokens();
         this.latencyMs = reply.metrics().latencyMs();
+        this.toolCalls = reply.toolCalls();
         this.promptVersion = promptVersion;
         this.createdAt = createdAt;
     }

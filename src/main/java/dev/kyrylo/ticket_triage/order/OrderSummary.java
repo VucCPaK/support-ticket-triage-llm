@@ -3,6 +3,7 @@ package dev.kyrylo.ticket_triage.order;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.List;
 
 public record OrderSummary (
         String orderNumber,
@@ -21,5 +22,9 @@ public record OrderSummary (
                 order.getEta(),
                 order.getCreatedAt()
         );
+    }
+
+    static List<OrderSummary> from(List<Order> orders) {
+        return orders.stream().map(OrderSummary::from).toList();
     }
 }

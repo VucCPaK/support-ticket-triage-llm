@@ -13,4 +13,6 @@ public interface OrderRepository extends JpaRepository<Order, UUID> {
     List<Order> findByCustomerEmailIgnoreCaseOrderByCreatedAtDesc(String email);
 
     Optional<Order> findByOrderNumberIgnoreCaseAndCustomerEmailIgnoreCase(String orderNumber, String customerEmail);
+
+    List<Order> findFirst5ByCustomerEmailIgnoreCaseOrderByCreatedAtDesc(String customerEmail);
 }

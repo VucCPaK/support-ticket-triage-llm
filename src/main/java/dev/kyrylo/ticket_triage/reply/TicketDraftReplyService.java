@@ -19,8 +19,10 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class TicketDraftReplyService {
@@ -29,14 +31,16 @@ public class TicketDraftReplyService {
     private final CostCalculator costCalculator;
     private final LlmProperties llmProperties;
     private final Clock clock;
+    private final DraftReplyTools draftReplyTools;
     private final TicketDraftReplyRepository ticketDraftReplyRepository;
 
-    public TicketDraftReplyService(@Qualifier("draftReplyChatClient") ChatClient chatClient, OrderService orderService, CostCalculator costCalculator, LlmProperties llmProperties, Clock clock, TicketDraftReplyRepository ticketDraftReplyRepository) {
+    public TicketDraftReplyService(@Qualifier("draftReplyChatClient") ChatClient chatClient, OrderService orderService, CostCalculator costCalculator, LlmProperties llmProperties, Clock clock, DraftReplyTools draftReplyTools, TicketDraftReplyRepository ticketDraftReplyRepository) {
         this.chatClient = chatClient;
         this.orderService = orderService;
         this.costCalculator = costCalculator;
         this.llmProperties = llmProperties;
         this.clock = clock;
+        this.draftReplyTools = draftReplyTools;
         this.ticketDraftReplyRepository = ticketDraftReplyRepository;
     }
 
@@ -49,10 +53,12 @@ public class TicketDraftReplyService {
                 ticket.getCustomerEmail());
         String orderText = order.map(this::formatOrder).orElse("not found");
 
+        AtomicInteger toolCalls = new AtomicInteger();
         long start = System.nanoTime();
         ChatResponse result = chatClient.prompt()
                 .user(u -> u.text(
                                 """
+                                        Today: {today}
                                         <ticket>
                                         Subject: {subject}
                                         Body: {body}
@@ -67,6 +73,7 @@ public class TicketDraftReplyService {
                                         {order}
                                         </order>
                                 """)
+                        .param("today", LocalDate.now(clock))
                         .param("subject", ticket.getSubject())
                         .param("body", ticket.getBody())
                         .param("category", triage.getCategory())
@@ -74,6 +81,10 @@ public class TicketDraftReplyService {
                         .param("escalate", triage.isEscalate())
                         .param("escalateReason", triage.getEscalateReason() == null ? "none" : triage.getEscalateReason())
                         .param("order", orderText))
+                .tools(draftReplyTools)
+                .toolContext(Map.of(
+                        "customerEmail", ticket.getCustomerEmail(),
+                        "toolCalls", toolCalls))
                 .call()
                 .chatResponse();
 
@@ -85,7 +96,7 @@ public class TicketDraftReplyService {
         BigDecimal cost = costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens());
         LlmCallMetrics metrics = LlmCallMetrics.from(result, cost, latencyMs);
 
-        DraftReply draftReply = new DraftReply(result.getResult().getOutput().getText(), orderText, metrics);
+        DraftReply draftReply = new DraftReply(result.getResult().getOutput().getText(), orderText, metrics, toolCalls.get());
         TicketDraftReply ticketDraftReply = TicketDraftReply.of(
                 ticket.getId(),
                 draftReply,

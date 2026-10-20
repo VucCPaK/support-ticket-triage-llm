@@ -1,0 +1,1 @@
+ALTER TABLE ticket_draft_reply ADD COLUMN tool_calls int NOT NULL DEFAULT 0;

@@ -1,6 +1,7 @@
 package dev.kyrylo.ticket_triage.config;
 
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,11 @@ public class ChatClientConfiguration {
             ChatClient.Builder builder,
             @Value("classpath:prompts/draft-reply-v${llm.draft.reply-version}.st") Resource systemPromptResource) {
 
-        return builder.defaultSystem(systemPromptResource).build();
+        // gpt-6-luna rejects function tools combined with reasoning in /v1/chat/completions,
+        // which is the API Spring AI uses. The draft does not need reasoning, so it is turned off here only.
+        return builder
+                .defaultSystem(systemPromptResource)
+                .defaultOptions(OpenAiChatOptions.builder().reasoningEffort("none"))
+                .build();
     }
 }
