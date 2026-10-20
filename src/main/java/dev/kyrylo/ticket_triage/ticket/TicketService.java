@@ -1,6 +1,9 @@
 package dev.kyrylo.ticket_triage.ticket;
 
 import dev.kyrylo.ticket_triage.customer.CustomerRepository;
+import dev.kyrylo.ticket_triage.reply.TicketDraftReply;
+import dev.kyrylo.ticket_triage.reply.TicketDraftReplyRepository;
+import dev.kyrylo.ticket_triage.reply.TicketDraftReplyService;
 import dev.kyrylo.ticket_triage.triage.*;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,6 +24,8 @@ public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final TicketTriageRepository ticketTriageRepository;
+    private final TicketDraftReplyService ticketDraftReplyService;
+    private final TicketDraftReplyRepository ticketDraftReplyRepository;
     private final CustomerRepository customerRepository;
     private final TicketTriageService ticketTriageService;
     private final Clock clock;
@@ -46,14 +51,28 @@ public class TicketService {
             log.warn("Triage failed for ticket {}", savedTicket.getId(), e);
             savedTicket.markTriageFailed();
         }
-        return TicketDetails.from(ticketRepository.save(savedTicket), triage);
+
+        // Persist the status before the draft call: the draft is optional and may be slow or fail
+        savedTicket = ticketRepository.save(savedTicket);
+
+        TicketDraftReply draftReply = null;
+        if (triage != null) {
+            try {
+                draftReply = ticketDraftReplyService.draftReply(savedTicket, triage);
+            } catch (Exception e) {
+                log.warn("Creating draft reply failed for ticket {}", savedTicket.getId(), e);
+            }
+        }
+
+        return new TicketDetails(savedTicket, triage, draftReply);
     }
 
     public TicketDetails get(UUID id) {
         Ticket ticket = ticketRepository.findById(id).orElseThrow(() -> new TicketNotFoundException(id));
         TicketTriage triage = ticketTriageRepository.findById(id).orElse(null);
+        TicketDraftReply draftReply = ticketDraftReplyRepository.findById(id).orElse(null);
 
-        return TicketDetails.from(ticket, triage);
+        return new TicketDetails(ticket, triage, draftReply);
     }
 
     @Transactional(readOnly = true)
@@ -62,12 +81,14 @@ public class TicketService {
                 ? ticketRepository.findAllByOrderByCreatedAtDesc()
                 : ticketRepository.findByStatusOrderByCreatedAtDesc(status);
 
-        Map<UUID, TicketTriage> triages = ticketTriageRepository
-                .findAllById(tickets.stream().map(Ticket::getId).toList()).stream()
+        List<UUID> ids = tickets.stream().map(Ticket::getId).toList();
+        Map<UUID, TicketTriage> triages = ticketTriageRepository.findAllById(ids).stream()
                 .collect(Collectors.toMap(TicketTriage::getTicketId, t -> t));
+        Map<UUID, TicketDraftReply> draftReplies = ticketDraftReplyRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(TicketDraftReply::getTicketId, d -> d));
 
         return tickets.stream()
-                .map(t -> TicketDetails.from(t, triages.get(t.getId())))
+                .map(t -> new TicketDetails(t, triages.get(t.getId()), draftReplies.get(t.getId())))
                 .toList();
     }
 }

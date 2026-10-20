@@ -14,7 +14,8 @@ public record TicketResponse(
         String body,
         TicketStatus status,
         Instant createdAt,
-        TriageResponse triage
+        TriageResponse triage,
+        String draftReply
 ) {
 
     public record TriageResponse(
@@ -45,7 +46,8 @@ public record TicketResponse(
                 details.ticket().getBody(),
                 details.ticket().getStatus(),
                 details.ticket().getCreatedAt(),
-                details.triage() == null ? null : from(details.triage())
+                details.triage() == null ? null : from(details.triage()),
+                details.draftReply() == null ? null : details.draftReply().getReplyText()
         );
     }
 }

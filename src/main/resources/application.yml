@@ -28,6 +28,8 @@ spring:
 llm:
   triage:
     prompt-version: 1
+  draft:
+    reply-version: 1
   pricing:            # USD per 1M tokens, checked 2026-10-03
     "[gpt-6-luna]":
       input: 0.10
