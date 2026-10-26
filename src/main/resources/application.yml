@@ -28,6 +28,8 @@ spring:
 llm:
   triage:
     prompt-version: 1
+    # Experiment: the baseline run used the model default (no value). Try low, then none.
+    reasoning-effort: low
   draft:
     reply-version: 2
   pricing:            # USD per 1M tokens, checked 2026-10-03

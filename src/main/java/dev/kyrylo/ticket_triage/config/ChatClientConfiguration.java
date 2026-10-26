@@ -12,9 +12,15 @@ public class ChatClientConfiguration {
     @Bean("triageChatClient")
     public ChatClient triageChatClient(
             ChatClient.Builder builder,
-            @Value("classpath:prompts/triage-system-v${llm.triage.prompt-version}.st") Resource systemPromptResource) {
+            @Value("classpath:prompts/triage-system-v${llm.triage.prompt-version}.st") Resource systemPromptResource,
+            // Empty means the model's own default; set it to compare speed and cost against quality in the eval
+            @Value("${llm.triage.reasoning-effort:}") String reasoningEffort) {
 
-        return builder.defaultSystem(systemPromptResource).build();
+        builder.defaultSystem(systemPromptResource);
+        if (!reasoningEffort.isBlank()) {
+            builder.defaultOptions(OpenAiChatOptions.builder().reasoningEffort(reasoningEffort));
+        }
+        return builder.build();
     }
 
     @Bean("draftReplyChatClient")
