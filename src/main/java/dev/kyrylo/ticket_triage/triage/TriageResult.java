@@ -7,7 +7,7 @@ public record TriageResult(
         TicketCategory category,
         @JsonPropertyDescription("Handling priority, decided by the Priority rules: impact on the customer and how fast it gets worse")
         TicketPriority priority,
-        @JsonPropertyDescription("Order number like A123, exactly as written in the ticket. Null if the ticket has no order number")
+        @JsonPropertyDescription("Order number like A123, decided by the Order number rules. Null if the ticket has no order number")
         String orderNumber,
         @JsonPropertyDescription("True only when the Escalation rules apply")
         boolean escalate,

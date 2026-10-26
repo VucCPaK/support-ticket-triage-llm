@@ -27,7 +27,7 @@ spring:
 
 llm:
   triage:
-    prompt-version: 2
+    prompt-version: 3
     # Empty = the model default. low was rejected in experiments 1 and 2: it misses order numbers.
     reasoning-effort:
   draft:
