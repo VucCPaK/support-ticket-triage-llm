@@ -15,4 +15,8 @@ public record TriageResult(
         String escalateReason,
         @JsonPropertyDescription("One short sentence in English describing what the customer wants")
         String summary
-) {}
+) {
+    public TriageResult withPriority(TicketPriority newPriority) {
+        return new TriageResult(category, newPriority, orderNumber, escalate, escalateReason, summary);
+    }
+}

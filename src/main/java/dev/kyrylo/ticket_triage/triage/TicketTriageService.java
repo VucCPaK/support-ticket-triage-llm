@@ -37,33 +37,53 @@ public class TicketTriageService {
 
 
     public TicketTriage triageTicket(String customerPlan, Ticket ticket) {
+        int promptVersion = llmProperties.triage().promptVersion();
+        // From prompt v2 the ENTERPRISE modifier is applied here, not by the model: the eval showed that with
+        // less reasoning the model forgets it. Code never forgets, and the ticket text cannot influence it.
+        // v1 still applies it in the prompt, so v1 keeps the plan in the message and skips the code modifier.
+        boolean planModifierInCode = promptVersion >= 2;
+
         long start = System.nanoTime();
         ResponseEntity<ChatResponse, TriageResult> result = chatClient.prompt()
-                .user(u -> u.text(
-                                """
+                .user(u -> {
+                    if (planModifierInCode) {
+                        u.text("""
+                                <ticket>
+                                Subject: {subject}
+                                Body: {body}
+                                </ticket>
+                                """);
+                    } else {
+                        u.text("""
                                 Customer plan: {customerPlan}
                                 <ticket>
                                 Subject: {subject}
                                 Body: {body}
                                 </ticket>
-                                """)
-                        .param("customerPlan", customerPlan)
-                        .param("subject", ticket.getSubject())
-                        .param("body", ticket.getBody()))
+                                """).param("customerPlan", customerPlan);
+                    }
+                    u.param("subject", ticket.getSubject())
+                            .param("body", ticket.getBody());
+                })
                 .call()
                 .responseEntity(TriageResult.class);
         int latencyMs = (int) ((System.nanoTime() - start) / 1_000_000);
 
-        Objects.requireNonNull(result.response(), "Usage response is null");
+        Objects.requireNonNull(result.response(), "Chat response is null");
         Usage usage = result.response().getMetadata().getUsage();
         BigDecimal cost = costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens());
         LlmCallMetrics metrics = LlmCallMetrics.from(result.response(), cost, latencyMs);
 
+        TriageResult triage = Objects.requireNonNull(result.entity(), "Triage result is null");
+        if (planModifierInCode && "ENTERPRISE".equals(customerPlan) && triage.priority() != null) {
+            triage = triage.withPriority(triage.priority().raise());
+        }
+
         TicketTriage ticketTriage = TicketTriage.of(
                 ticket.getId(),
-                result.entity(),
+                triage,
                 metrics,
-                llmProperties.triage().promptVersion(),
+                promptVersion,
                 Instant.now(clock));
         return ticketTriageRepository.save(ticketTriage);
     }

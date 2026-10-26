@@ -27,7 +27,7 @@ spring:
 
 llm:
   triage:
-    prompt-version: 1
+    prompt-version: 2
     # Experiment: the baseline run used the model default (no value). Try low, then none.
     reasoning-effort: low
   draft:
