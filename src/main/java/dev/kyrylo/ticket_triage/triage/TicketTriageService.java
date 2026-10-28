@@ -1,17 +1,16 @@
 package dev.kyrylo.ticket_triage.triage;
 
 import dev.kyrylo.ticket_triage.common.CostCalculator;
+import dev.kyrylo.ticket_triage.common.LlmMetrics;
 import dev.kyrylo.ticket_triage.config.LlmProperties;
 import dev.kyrylo.ticket_triage.ticket.Ticket;
 import lombok.AllArgsConstructor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
-import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
@@ -70,9 +69,7 @@ public class TicketTriageService {
         int latencyMs = (int) ((System.nanoTime() - start) / 1_000_000);
 
         Objects.requireNonNull(result.response(), "Chat response is null");
-        Usage usage = result.response().getMetadata().getUsage();
-        BigDecimal cost = costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens());
-        LlmCallMetrics metrics = LlmCallMetrics.from(result.response(), cost, latencyMs);
+        LlmCallMetrics metrics = LlmCallMetrics.from(result.response(), costCalculator, latencyMs);
 
         TriageResult triage = Objects.requireNonNull(result.entity(), "Triage result is null");
         if (planModifierInCode && "ENTERPRISE".equals(customerPlan) && triage.priority() != null) {

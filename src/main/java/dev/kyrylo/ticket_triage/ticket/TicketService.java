@@ -1,5 +1,6 @@
 package dev.kyrylo.ticket_triage.ticket;
 
+import dev.kyrylo.ticket_triage.common.LlmMetrics;
 import dev.kyrylo.ticket_triage.customer.CustomerRepository;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReply;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReplyRepository;
@@ -29,6 +30,7 @@ public class TicketService {
     private final CustomerRepository customerRepository;
     private final TicketTriageService ticketTriageService;
     private final Clock clock;
+    private final LlmMetrics llmMetrics;
 
     public TicketDetails create(CreateTicketRequest request) {
         Ticket ticket = Ticket.open(
@@ -47,9 +49,11 @@ public class TicketService {
         try {
             triage = ticketTriageService.triageTicket(customerPlan, savedTicket);
             savedTicket.markTriaged();
+            llmMetrics.recordSuccess("triage", "triaged");
         } catch (Exception e) {
             log.warn("Triage failed for ticket {}", savedTicket.getId(), e);
             savedTicket.markTriageFailed();
+            llmMetrics.recordFailure("triage", e);
         }
 
         // Persist the status before the draft call: the draft is optional and may be slow or fail
@@ -59,8 +63,10 @@ public class TicketService {
         if (triage != null) {
             try {
                 draftReply = ticketDraftReplyService.draftReply(savedTicket, triage);
+                llmMetrics.recordSuccess("draft", "drafted");
             } catch (Exception e) {
                 log.warn("Creating draft reply failed for ticket {}", savedTicket.getId(), e);
+                llmMetrics.recordFailure("draft", e);
             }
         }
 

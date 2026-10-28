@@ -1,6 +1,7 @@
 package dev.kyrylo.ticket_triage.triage;
 
 import com.openai.models.completions.CompletionUsage;
+import dev.kyrylo.ticket_triage.common.CostCalculator;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -19,7 +20,11 @@ public record LlmCallMetrics(
         int latencyMs
 ) {
 
-    public static LlmCallMetrics from(ChatResponse response, BigDecimal costUsd, int latencyMs) {
+    /**
+     * The cost is derived from prices in the config, which only the CostCalculator bean knows;
+     * it is passed in, so the record stays free of Spring and a test can pass its own prices.
+     */
+    public static LlmCallMetrics from(ChatResponse response, CostCalculator costCalculator, int latencyMs) {
         ChatResponseMetadata metadata = response.getMetadata();
         Usage usage = metadata.getUsage();
         return new LlmCallMetrics(
@@ -27,7 +32,7 @@ public record LlmCallMetrics(
                 usage.getPromptTokens(),
                 usage.getCompletionTokens(),
                 reasoningTokens(usage),
-                costUsd,
+                costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens()),
                 latencyMs
         );
     }

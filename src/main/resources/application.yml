@@ -25,6 +25,12 @@ spring:
       chat:
         model: gpt-6-luna
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, metrics  # local only; the public deployment in step 6 needs these protected
+
 llm:
   triage:
     prompt-version: 3

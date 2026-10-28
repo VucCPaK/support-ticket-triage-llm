@@ -1,20 +1,18 @@
 package dev.kyrylo.ticket_triage.reply;
 
 import dev.kyrylo.ticket_triage.common.CostCalculator;
+import dev.kyrylo.ticket_triage.common.LlmMetrics;
 import dev.kyrylo.ticket_triage.config.LlmProperties;
 import dev.kyrylo.ticket_triage.order.OrderService;
 import dev.kyrylo.ticket_triage.order.OrderSummary;
 import dev.kyrylo.ticket_triage.ticket.Ticket;
-import dev.kyrylo.ticket_triage.ticket.TicketDetails;
 import dev.kyrylo.ticket_triage.triage.LlmCallMetrics;
 import dev.kyrylo.ticket_triage.triage.TicketTriage;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
-import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -92,9 +90,7 @@ public class TicketDraftReplyService {
 
         Objects.requireNonNull(result, "Chat response is null");
         Objects.requireNonNull(result.getResult(), "Chat response has no result");
-        Usage usage = result.getMetadata().getUsage();
-        BigDecimal cost = costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens());
-        LlmCallMetrics metrics = LlmCallMetrics.from(result, cost, latencyMs);
+        LlmCallMetrics metrics = LlmCallMetrics.from(result, costCalculator, latencyMs);
 
         DraftReply draftReply = new DraftReply(result.getResult().getOutput().getText(), orderText, metrics, toolCalls.get());
         TicketDraftReply ticketDraftReply = TicketDraftReply.of(
