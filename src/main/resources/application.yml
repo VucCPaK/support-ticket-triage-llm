@@ -20,8 +20,8 @@ spring:
   ai:
     openai:
       api-key: ${OPENAI_API_KEY}
-      timeout: 30s
-      max-retries: 2
+      timeout: 12s
+      max-retries: 1
       chat:
         model: gpt-6-luna
 
@@ -38,10 +38,17 @@ llm:
     reasoning-effort:
   draft:
     reply-version: 2
+  fallback:
+    model: gpt-5-nano   # not run through the eval: accepted as is to keep tickets triaged during outages
+  budget:
+    daily-usd: 1.00     # ~2,600 tickets a day at the measured $0.00038 per ticket
   pricing:            # USD per 1M tokens, checked 2026-10-03
     "[gpt-6-luna]":
       input: 0.10
       output: 0.50
+    "[gpt-5-nano]":     # verify against the provider's price page
+      input: 0.05
+      output: 0.40
     "[gpt-6.1-sol]":
       input: 2.00
       output: 10.00

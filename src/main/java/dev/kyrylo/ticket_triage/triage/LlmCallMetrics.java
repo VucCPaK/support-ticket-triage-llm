@@ -32,7 +32,7 @@ public record LlmCallMetrics(
                 usage.getPromptTokens(),
                 usage.getCompletionTokens(),
                 reasoningTokens(usage),
-                costCalculator.cost(usage.getPromptTokens(), usage.getCompletionTokens()),
+                costCalculator.cost(metadata.getModel(), usage.getPromptTokens(), usage.getCompletionTokens()),
                 latencyMs
         );
     }

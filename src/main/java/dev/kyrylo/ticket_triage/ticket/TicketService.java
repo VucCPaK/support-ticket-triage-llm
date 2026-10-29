@@ -1,5 +1,6 @@
 package dev.kyrylo.ticket_triage.ticket;
 
+import dev.kyrylo.ticket_triage.common.BudgetGuard;
 import dev.kyrylo.ticket_triage.common.LlmMetrics;
 import dev.kyrylo.ticket_triage.customer.CustomerRepository;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReply;
@@ -31,6 +32,7 @@ public class TicketService {
     private final TicketTriageService ticketTriageService;
     private final Clock clock;
     private final LlmMetrics llmMetrics;
+    private final BudgetGuard budgetGuard;
 
     public TicketDetails create(CreateTicketRequest request) {
         Ticket ticket = Ticket.open(
@@ -46,21 +48,31 @@ public class TicketService {
                 .orElse("UNKNOWN");
 
         TicketTriage triage = null;
-        try {
-            triage = ticketTriageService.triageTicket(customerPlan, savedTicket);
-            savedTicket.markTriaged();
-            llmMetrics.recordSuccess("triage", "triaged");
-        } catch (Exception e) {
-            log.warn("Triage failed for ticket {}", savedTicket.getId(), e);
-            savedTicket.markTriageFailed();
-            llmMetrics.recordFailure("triage", e);
+        if (budgetGuard.isExhausted()) {
+            // Checked before the call: its cost is known only afterwards, and a paid answer is never thrown away
+            log.warn("Daily LLM budget is used up, ticket {} is saved without triage", savedTicket.getId());
+            savedTicket.markTriageSkipped();
+            llmMetrics.recordSkipped("triage", "budget");
+        } else {
+            try {
+                triage = ticketTriageService.triageTicket(customerPlan, savedTicket);
+                savedTicket.markTriaged();
+                llmMetrics.recordSuccess("triage", "triaged");
+            } catch (Exception e) {
+                log.warn("Triage failed for ticket {}", savedTicket.getId(), e);
+                savedTicket.markTriageFailed();
+                llmMetrics.recordFailure("triage", e);
+            }
         }
 
         // Persist the status before the draft call: the draft is optional and may be slow or fail
         savedTicket = ticketRepository.save(savedTicket);
 
         TicketDraftReply draftReply = null;
-        if (triage != null) {
+        if (triage != null && budgetGuard.isExhausted()) {
+            // The triage call may have just crossed the cap; the draft is optional, so it is the one to skip
+            llmMetrics.recordSkipped("draft", "budget");
+        } else if (triage != null) {
             try {
                 draftReply = ticketDraftReplyService.draftReply(savedTicket, triage);
                 llmMetrics.recordSuccess("draft", "drafted");

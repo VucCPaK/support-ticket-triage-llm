@@ -30,6 +30,26 @@ public class ChatClientConfiguration {
         return builder.build();
     }
 
+    /**
+     * Same prompt and metrics as triageChatClient, another model. Used only when the main model fails
+     * with a rate limit, a server error or a timeout. Not run through the eval: an accepted risk,
+     * a rough triage beats a ticket with none while the main model is down.
+     */
+    @Bean("triageFallbackChatClient")
+    public ChatClient triageFallbackChatClient(
+            ChatClient.Builder builder,
+            CostCalculator costCalculator,
+            LlmMetrics llmMetrics,
+            LlmProperties llmProperties,
+            @Value("classpath:prompts/triage-system-v${llm.triage.prompt-version}.st") Resource systemPromptResource) {
+
+        return builder
+                .defaultSystem(systemPromptResource)
+                .defaultAdvisors(new MetricsAdvisor("triage", costCalculator, llmMetrics))
+                .defaultOptions(OpenAiChatOptions.builder().model(llmProperties.fallback().model()))
+                .build();
+    }
+
     @Bean("draftReplyChatClient")
     public ChatClient draftReplyChatClient(
             ChatClient.Builder builder,

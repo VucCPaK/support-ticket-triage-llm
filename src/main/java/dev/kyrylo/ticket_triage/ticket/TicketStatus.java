@@ -1,5 +1,5 @@
 package dev.kyrylo.ticket_triage.ticket;
 
 public enum TicketStatus {
-    NEW, TRIAGED, TRIAGE_FAILED
+    NEW, TRIAGED, TRIAGE_FAILED, TRIAGE_SKIPPED
 }

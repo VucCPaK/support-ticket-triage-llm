@@ -62,6 +62,12 @@ public class Ticket {
         this.status = TicketStatus.TRIAGE_FAILED;
     }
 
+    /** The daily LLM budget is used up: the ticket waits for a human instead of the model. */
+    public void markTriageSkipped() {
+        requireStatus(TicketStatus.NEW);
+        this.status = TicketStatus.TRIAGE_SKIPPED;
+    }
+
     private void requireStatus(TicketStatus expected) {
         if (status != expected) {
             throw new IllegalStateException("Ticket " + id + " is " + status + ", expected " + expected);
