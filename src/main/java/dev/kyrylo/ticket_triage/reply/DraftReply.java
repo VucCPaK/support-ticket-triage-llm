@@ -1,6 +1,6 @@
 package dev.kyrylo.ticket_triage.reply;
 
-import dev.kyrylo.ticket_triage.triage.LlmCallMetrics;
+import dev.kyrylo.ticket_triage.llm.LlmCallMetrics;
 
 public record DraftReply (
     String text,

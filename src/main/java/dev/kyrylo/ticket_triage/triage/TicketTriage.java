@@ -1,5 +1,6 @@
 package dev.kyrylo.ticket_triage.triage;
 
+import dev.kyrylo.ticket_triage.llm.LlmCallMetrics;
 import jakarta.persistence.*;
 import lombok.Getter;
 

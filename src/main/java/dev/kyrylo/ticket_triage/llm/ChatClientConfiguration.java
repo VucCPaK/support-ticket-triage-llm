@@ -1,8 +1,5 @@
-package dev.kyrylo.ticket_triage.config;
+package dev.kyrylo.ticket_triage.llm;
 
-import dev.kyrylo.ticket_triage.common.CostCalculator;
-import dev.kyrylo.ticket_triage.common.LlmMetrics;
-import dev.kyrylo.ticket_triage.common.MetricsAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.beans.factory.annotation.Value;

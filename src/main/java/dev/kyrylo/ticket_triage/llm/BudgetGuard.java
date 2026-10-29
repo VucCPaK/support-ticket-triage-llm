@@ -1,13 +1,12 @@
-package dev.kyrylo.ticket_triage.common;
+package dev.kyrylo.ticket_triage.llm;
 
-import dev.kyrylo.ticket_triage.config.LlmProperties;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.time.Clock;
-import java.time.Instant;
 import java.time.LocalDate;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 
 /**
@@ -33,7 +32,8 @@ public class BudgetGuard {
 
     /** Spend since midnight UTC across both LLM steps; the database is shared by all app instances. */
     public BigDecimal spentToday() {
-        Instant startOfDay = LocalDate.now(clock).atStartOfDay(ZoneOffset.UTC).toInstant();
+        // OffsetDateTime, not Instant: the PostgreSQL driver maps OffsetDateTime to timestamptz, Instant it cannot bind
+        OffsetDateTime startOfDay = LocalDate.now(clock).atStartOfDay().atOffset(ZoneOffset.UTC);
         return jdbcClient.sql("""
                         SELECT COALESCE(SUM(usd_cost), 0) FROM (
                             SELECT usd_cost FROM ticket_triage WHERE created_at >= :since

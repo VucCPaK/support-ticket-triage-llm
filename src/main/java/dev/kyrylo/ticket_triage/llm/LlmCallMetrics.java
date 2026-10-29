@@ -1,7 +1,6 @@
-package dev.kyrylo.ticket_triage.triage;
+package dev.kyrylo.ticket_triage.llm;
 
 import com.openai.models.completions.CompletionUsage;
-import dev.kyrylo.ticket_triage.common.CostCalculator;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;

@@ -1,11 +1,10 @@
 package dev.kyrylo.ticket_triage.triage;
 
-import dev.kyrylo.ticket_triage.common.CostCalculator;
-import dev.kyrylo.ticket_triage.common.LlmMetrics;
-import dev.kyrylo.ticket_triage.common.ModelErrors;
-import dev.kyrylo.ticket_triage.config.LlmProperties;
+import dev.kyrylo.ticket_triage.llm.CostCalculator;
+import dev.kyrylo.ticket_triage.llm.FallbackCaller;
+import dev.kyrylo.ticket_triage.llm.LlmCallMetrics;
+import dev.kyrylo.ticket_triage.llm.LlmProperties;
 import dev.kyrylo.ticket_triage.ticket.Ticket;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -16,31 +15,30 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Objects;
 
-@Slf4j
 @Service
 public class TicketTriageService {
     private final TicketTriageRepository ticketTriageRepository;
     private final ChatClient chatClient;
     private final ChatClient fallbackChatClient;
+    private final FallbackCaller fallbackCaller;
     private final CostCalculator costCalculator;
     private final LlmProperties llmProperties;
     private final Clock clock;
-    private final LlmMetrics llmMetrics;
 
     public TicketTriageService(TicketTriageRepository ticketTriageRepository,
                                @Qualifier("triageChatClient") ChatClient chatClient,
                                @Qualifier("triageFallbackChatClient") ChatClient fallbackChatClient,
+                               FallbackCaller fallbackCaller,
                                CostCalculator costCalculator, LlmProperties llmProperties,
-                               Clock clock, LlmMetrics llmMetrics) {
+                               Clock clock) {
         this.ticketTriageRepository = ticketTriageRepository;
         this.chatClient = chatClient;
         this.fallbackChatClient = fallbackChatClient;
+        this.fallbackCaller = fallbackCaller;
         this.costCalculator = costCalculator;
         this.llmProperties = llmProperties;
         this.clock = clock;
-        this.llmMetrics = llmMetrics;
     }
-
 
     public TicketTriage triageTicket(String customerPlan, Ticket ticket) {
         int promptVersion = llmProperties.triage().promptVersion();
@@ -49,38 +47,24 @@ public class TicketTriageService {
         // v1 still applies it in the prompt, so v1 keeps the plan in the message and skips the code modifier.
         boolean planModifierInCode = promptVersion >= 2;
 
-        ModelAnswer answer;
-        try {
-            answer = callModel(chatClient, customerPlan, ticket, planModifierInCode);
-        } catch (RuntimeException e) {
-            if (!ModelErrors.isProviderUnavailable(e)) {
-                throw e;  // our request is wrong: the fallback model would fail the same way
-            }
-            log.warn("Main triage model failed for ticket {}, trying the fallback model", ticket.getId(), e);
-            llmMetrics.recordFallback("triage", e);
-            answer = callModel(fallbackChatClient, customerPlan, ticket, planModifierInCode);
-        }
+        TriageCall call = fallbackCaller.call("triage",
+                () -> callModel(chatClient, customerPlan, ticket, planModifierInCode),
+                () -> callModel(fallbackChatClient, customerPlan, ticket, planModifierInCode));
 
-        Objects.requireNonNull(answer.result().response(), "Chat response is null");
-        LlmCallMetrics metrics = LlmCallMetrics.from(answer.result().response(), costCalculator, answer.latencyMs());
-
-        TriageResult triage = Objects.requireNonNull(answer.result().entity(), "Triage result is null");
+        TriageResult triage = call.result();
         if (planModifierInCode && "ENTERPRISE".equals(customerPlan) && triage.priority() != null) {
             triage = triage.withPriority(triage.priority().raise());
         }
 
-        TicketTriage ticketTriage = TicketTriage.of(
+        return ticketTriageRepository.save(TicketTriage.of(
                 ticket.getId(),
                 triage,
-                metrics,
+                call.metrics(),
                 promptVersion,
-                Instant.now(clock));
-        return ticketTriageRepository.save(ticketTriage);
+                Instant.now(clock)));
     }
 
-    private record ModelAnswer(ResponseEntity<ChatResponse, TriageResult> result, int latencyMs) {}
-
-    private ModelAnswer callModel(ChatClient client, String customerPlan, Ticket ticket, boolean planModifierInCode) {
+    private TriageCall callModel(ChatClient client, String customerPlan, Ticket ticket, boolean planModifierInCode) {
         long start = System.nanoTime();
         ResponseEntity<ChatResponse, TriageResult> result = client.prompt()
                 .user(u -> {
@@ -105,6 +89,10 @@ public class TicketTriageService {
                 })
                 .call()
                 .responseEntity(TriageResult.class);
-        return new ModelAnswer(result, (int) ((System.nanoTime() - start) / 1_000_000));
+        int latencyMs = (int) ((System.nanoTime() - start) / 1_000_000);
+
+        ChatResponse response = Objects.requireNonNull(result.response(), "Chat response is null");
+        TriageResult triage = Objects.requireNonNull(result.entity(), "Triage result is null");
+        return new TriageCall(triage, LlmCallMetrics.from(response, costCalculator, latencyMs));
     }
 }

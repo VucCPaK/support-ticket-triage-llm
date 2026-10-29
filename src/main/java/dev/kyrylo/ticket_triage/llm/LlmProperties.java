@@ -1,4 +1,4 @@
-package dev.kyrylo.ticket_triage.config;
+package dev.kyrylo.ticket_triage.llm;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 

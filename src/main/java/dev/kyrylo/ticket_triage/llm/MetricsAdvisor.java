@@ -1,6 +1,5 @@
-package dev.kyrylo.ticket_triage.common;
+package dev.kyrylo.ticket_triage.llm;
 
-import dev.kyrylo.ticket_triage.triage.LlmCallMetrics;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClientRequest;
 import org.springframework.ai.chat.client.ChatClientResponse;

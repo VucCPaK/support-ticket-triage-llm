@@ -1,6 +1,5 @@
-package dev.kyrylo.ticket_triage.common;
+package dev.kyrylo.ticket_triage.llm;
 
-import dev.kyrylo.ticket_triage.config.LlmProperties;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 

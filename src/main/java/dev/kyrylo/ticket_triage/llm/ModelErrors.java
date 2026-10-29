@@ -1,4 +1,4 @@
-package dev.kyrylo.ticket_triage.common;
+package dev.kyrylo.ticket_triage.llm;
 
 import com.openai.errors.InternalServerException;
 import com.openai.errors.OpenAIIoException;

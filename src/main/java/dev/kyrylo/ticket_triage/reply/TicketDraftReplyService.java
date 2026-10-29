@@ -1,12 +1,11 @@
 package dev.kyrylo.ticket_triage.reply;
 
-import dev.kyrylo.ticket_triage.common.CostCalculator;
-import dev.kyrylo.ticket_triage.common.LlmMetrics;
-import dev.kyrylo.ticket_triage.config.LlmProperties;
+import dev.kyrylo.ticket_triage.llm.CostCalculator;
+import dev.kyrylo.ticket_triage.llm.LlmProperties;
 import dev.kyrylo.ticket_triage.order.OrderService;
 import dev.kyrylo.ticket_triage.order.OrderSummary;
 import dev.kyrylo.ticket_triage.ticket.Ticket;
-import dev.kyrylo.ticket_triage.triage.LlmCallMetrics;
+import dev.kyrylo.ticket_triage.llm.LlmCallMetrics;
 import dev.kyrylo.ticket_triage.triage.TicketTriage;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatResponse;

@@ -1,14 +1,10 @@
 package dev.kyrylo.ticket_triage.ticket;
 
-import dev.kyrylo.ticket_triage.common.BudgetGuard;
-import dev.kyrylo.ticket_triage.common.LlmMetrics;
-import dev.kyrylo.ticket_triage.customer.CustomerRepository;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReply;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReplyRepository;
-import dev.kyrylo.ticket_triage.reply.TicketDraftReplyService;
-import dev.kyrylo.ticket_triage.triage.*;
+import dev.kyrylo.ticket_triage.triage.TicketTriage;
+import dev.kyrylo.ticket_triage.triage.TicketTriageRepository;
 import lombok.AllArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,18 +17,13 @@ import java.util.stream.Collectors;
 
 @Service
 @AllArgsConstructor
-@Slf4j
 public class TicketService {
 
     private final TicketRepository ticketRepository;
     private final TicketTriageRepository ticketTriageRepository;
-    private final TicketDraftReplyService ticketDraftReplyService;
     private final TicketDraftReplyRepository ticketDraftReplyRepository;
-    private final CustomerRepository customerRepository;
-    private final TicketTriageService ticketTriageService;
+    private final TicketProcessor ticketProcessor;
     private final Clock clock;
-    private final LlmMetrics llmMetrics;
-    private final BudgetGuard budgetGuard;
 
     public TicketDetails create(CreateTicketRequest request) {
         Ticket ticket = Ticket.open(
@@ -41,48 +32,7 @@ public class TicketService {
                 request.body().trim(),
                 Instant.now(clock)
         );
-        Ticket savedTicket = ticketRepository.save(ticket);
-
-        String customerPlan = customerRepository.findByEmailIgnoreCase(request.customerEmail().trim())
-                .map(c -> c.getPlan().name())
-                .orElse("UNKNOWN");
-
-        TicketTriage triage = null;
-        if (budgetGuard.isExhausted()) {
-            // Checked before the call: its cost is known only afterwards, and a paid answer is never thrown away
-            log.warn("Daily LLM budget is used up, ticket {} is saved without triage", savedTicket.getId());
-            savedTicket.markTriageSkipped();
-            llmMetrics.recordSkipped("triage", "budget");
-        } else {
-            try {
-                triage = ticketTriageService.triageTicket(customerPlan, savedTicket);
-                savedTicket.markTriaged();
-                llmMetrics.recordSuccess("triage", "triaged");
-            } catch (Exception e) {
-                log.warn("Triage failed for ticket {}", savedTicket.getId(), e);
-                savedTicket.markTriageFailed();
-                llmMetrics.recordFailure("triage", e);
-            }
-        }
-
-        // Persist the status before the draft call: the draft is optional and may be slow or fail
-        savedTicket = ticketRepository.save(savedTicket);
-
-        TicketDraftReply draftReply = null;
-        if (triage != null && budgetGuard.isExhausted()) {
-            // The triage call may have just crossed the cap; the draft is optional, so it is the one to skip
-            llmMetrics.recordSkipped("draft", "budget");
-        } else if (triage != null) {
-            try {
-                draftReply = ticketDraftReplyService.draftReply(savedTicket, triage);
-                llmMetrics.recordSuccess("draft", "drafted");
-            } catch (Exception e) {
-                log.warn("Creating draft reply failed for ticket {}", savedTicket.getId(), e);
-                llmMetrics.recordFailure("draft", e);
-            }
-        }
-
-        return new TicketDetails(savedTicket, triage, draftReply);
+        return ticketProcessor.process(ticketRepository.save(ticket));
     }
 
     public TicketDetails get(UUID id) {

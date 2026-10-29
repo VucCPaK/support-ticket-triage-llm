@@ -1,6 +1,5 @@
-package dev.kyrylo.ticket_triage.common;
+package dev.kyrylo.ticket_triage.llm;
 
-import dev.kyrylo.ticket_triage.triage.LlmCallMetrics;
 import io.micrometer.core.instrument.Counter;
 import io.micrometer.core.instrument.DistributionSummary;
 import io.micrometer.core.instrument.MeterRegistry;
