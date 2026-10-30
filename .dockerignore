@@ -1,0 +1,13 @@
+# Secrets: never in the build context, so never in an image layer
+.env
+
+# Built again inside the image
+target/
+
+# Not needed by the application
+.git
+.idea/
+*.iml
+eval/
+HELP.md
+compose.yaml
