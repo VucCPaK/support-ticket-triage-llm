@@ -1,7 +1,9 @@
 package dev.kyrylo.ticket_triage.reply;
 
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
+import org.springframework.data.domain.Persistable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -11,7 +13,13 @@ import java.util.UUID;
 @Entity
 @Table(name = "ticket_draft_reply")
 @Getter
-public class TicketDraftReply {
+public class TicketDraftReply implements Persistable<UUID> {
+    // A result is written once. Persistable makes save() an INSERT for a new object instead of a merge,
+    // so a second worker (after an expired lease) fails on the primary key instead of overwriting the first.
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private boolean persisted;
+
     @Id
     @Column(name = "ticket_id")
     private UUID ticketId;
@@ -75,5 +83,21 @@ public class TicketDraftReply {
 
     public static TicketDraftReply of(UUID ticketId, DraftReply reply, int promptVersion, Instant now) {
         return new TicketDraftReply(ticketId, reply, promptVersion, now);
+    }
+
+    @Override
+    public UUID getId() {
+        return ticketId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return !persisted;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markPersisted() {
+        this.persisted = true;
     }
 }

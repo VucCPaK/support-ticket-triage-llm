@@ -6,6 +6,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.Getter;
 
 import java.time.Instant;
@@ -35,6 +36,21 @@ public class Ticket {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    // Written by the recovery job's claim query; the entity only reads them and records the last error
+    @Column(nullable = false)
+    private int attempts;
+
+    @Column(name = "next_attempt_at")
+    private Instant nextAttemptAt;
+
+    @Column(name = "last_error")
+    private String lastError;
+
+    // A stale save (another worker re-claimed the ticket meanwhile) fails instead of overwriting newer data.
+    // Long, not long: null tells Spring Data the ticket is new, since the id is assigned in open()
+    @Version
+    private Long version;
+
     protected Ticket() {
         // for JPA
     }
@@ -55,11 +71,13 @@ public class Ticket {
     public void markTriaged() {
         requireStatus(TicketStatus.NEW);
         this.status = TicketStatus.TRIAGED;
+        this.lastError = null;
     }
 
-    public void markTriageFailed() {
+    public void markTriageFailed(String error) {
         requireStatus(TicketStatus.NEW);
         this.status = TicketStatus.TRIAGE_FAILED;
+        this.lastError = error.length() > 500 ? error.substring(0, 500) : error;
     }
 
     /** The daily LLM budget is used up: the ticket waits for a human instead of the model. */

@@ -31,6 +31,15 @@ management:
       exposure:
         include: health, metrics  # local only; the public deployment in step 6 needs these protected
 
+tickets:
+  recovery:
+    enabled: false       # retries call the model: every recovered ticket is a paid triage (+ draft)
+    interval: PT1M       # ISO-8601: @Scheduled parses this string itself
+    lease: 4m           # checked at startup against the worst case of one ticket (now ~3m12s with margin)
+    stale-after: 5m     # also checked at startup: a new ticket still processing must not look abandoned
+    max-attempts: 5     # backoff 1, 4, 16, 64, 256 minutes, then a human takes over
+    batch-size: 10
+
 llm:
   triage:
     prompt-version: 3

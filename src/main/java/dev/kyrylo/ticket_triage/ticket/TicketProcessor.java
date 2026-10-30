@@ -4,15 +4,18 @@ import dev.kyrylo.ticket_triage.customer.CustomerRepository;
 import dev.kyrylo.ticket_triage.llm.BudgetGuard;
 import dev.kyrylo.ticket_triage.llm.LlmMetrics;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReply;
+import dev.kyrylo.ticket_triage.reply.TicketDraftReplyRepository;
 import dev.kyrylo.ticket_triage.reply.TicketDraftReplyService;
 import dev.kyrylo.ticket_triage.triage.TicketTriage;
+import dev.kyrylo.ticket_triage.triage.TicketTriageRepository;
 import dev.kyrylo.ticket_triage.triage.TicketTriageService;
 import lombok.extern.slf4j.Slf4j;
 import org.jspecify.annotations.Nullable;
 import org.springframework.stereotype.Component;
 
 /**
- * The AI pipeline for one saved ticket: triage, then the optional draft reply.
+ * The AI pipeline for one saved ticket: triage, then the optional draft reply. Used for new tickets
+ * and by the recovery job, so it is idempotent: what is already saved is reused, not paid for again.
  * Each step checks the daily budget, records its outcome, and never lets a failure escape:
  * the ticket is kept either way and its status says what happened.
  */
@@ -23,16 +26,22 @@ public class TicketProcessor {
     private final CustomerRepository customerRepository;
     private final TicketTriageService ticketTriageService;
     private final TicketDraftReplyService ticketDraftReplyService;
+    private final TicketTriageRepository ticketTriageRepository;
+    private final TicketDraftReplyRepository ticketDraftReplyRepository;
     private final BudgetGuard budgetGuard;
     private final LlmMetrics llmMetrics;
 
     public TicketProcessor(TicketRepository ticketRepository, CustomerRepository customerRepository,
                            TicketTriageService ticketTriageService, TicketDraftReplyService ticketDraftReplyService,
+                           TicketTriageRepository ticketTriageRepository,
+                           TicketDraftReplyRepository ticketDraftReplyRepository,
                            BudgetGuard budgetGuard, LlmMetrics llmMetrics) {
         this.ticketRepository = ticketRepository;
         this.customerRepository = customerRepository;
         this.ticketTriageService = ticketTriageService;
         this.ticketDraftReplyService = ticketDraftReplyService;
+        this.ticketTriageRepository = ticketTriageRepository;
+        this.ticketDraftReplyRepository = ticketDraftReplyRepository;
         this.budgetGuard = budgetGuard;
         this.llmMetrics = llmMetrics;
     }
@@ -46,6 +55,12 @@ public class TicketProcessor {
     }
 
     private @Nullable TicketTriage runTriage(Ticket ticket) {
+        // A retry after a crash between saving the triage and saving the status: the triage is already paid for
+        var existing = ticketTriageRepository.findById(ticket.getId());
+        if (existing.isPresent()) {
+            ticket.markTriaged();
+            return existing.get();
+        }
         // Checked before the call: its cost is known only afterwards, and a paid answer is never thrown away
         if (budgetGuard.isExhausted()) {
             log.warn("Daily LLM budget is used up, ticket {} is saved without triage", ticket.getId());
@@ -60,13 +75,17 @@ public class TicketProcessor {
             return triage;
         } catch (Exception e) {
             log.warn("Triage failed for ticket {}", ticket.getId(), e);
-            ticket.markTriageFailed();
+            ticket.markTriageFailed(e.toString());
             llmMetrics.recordFailure("triage", e);
             return null;
         }
     }
 
     private @Nullable TicketDraftReply runDraft(Ticket ticket, TicketTriage triage) {
+        var existing = ticketDraftReplyRepository.findById(ticket.getId());
+        if (existing.isPresent()) {
+            return existing.get();
+        }
         // The triage call may have just crossed the cap; the draft is optional, so it is the one to skip
         if (budgetGuard.isExhausted()) {
             llmMetrics.recordSkipped("draft", "budget");

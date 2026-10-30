@@ -2,7 +2,9 @@ package dev.kyrylo.ticket_triage.triage;
 
 import dev.kyrylo.ticket_triage.llm.LlmCallMetrics;
 import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
+import org.springframework.data.domain.Persistable;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -12,7 +14,13 @@ import java.util.UUID;
 @Entity
 @Table(name = "ticket_triage")
 @Getter
-public class TicketTriage {
+public class TicketTriage implements Persistable<UUID> {
+    // A result is written once. Persistable makes save() an INSERT for a new object instead of a merge,
+    // so a second worker (after an expired lease) fails on the primary key instead of overwriting the first.
+    @Transient
+    @Getter(AccessLevel.NONE)
+    private boolean persisted;
+
     @Id
     @Column(name = "ticket_id")
     private UUID ticketId;
@@ -93,5 +101,21 @@ public class TicketTriage {
     // Models often return "" instead of null for missing values
     private static String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    @Override
+    public UUID getId() {
+        return ticketId;
+    }
+
+    @Override
+    public boolean isNew() {
+        return !persisted;
+    }
+
+    @PostLoad
+    @PostPersist
+    void markPersisted() {
+        this.persisted = true;
     }
 }
