@@ -7,8 +7,22 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.io.Resource;
 
+import java.time.Duration;
+
 @Configuration
 public class ChatClientConfiguration {
+    private final Duration requestTimeout;
+
+    /**
+     * Spring AI 2.0.1 sends every chat request with its own timeout from OpenAiChatOptions (60s by default),
+     * which overrides spring.ai.openai.timeout on the HTTP client. Found by OpenAiProtocolTest: a 4s answer
+     * was awaited with a 2s timeout. So the same setting is put into the options of every client here,
+     * and the recovery lease check computes the worst case from the value that really applies.
+     */
+    public ChatClientConfiguration(@Value("${spring.ai.openai.timeout}") Duration requestTimeout) {
+        this.requestTimeout = requestTimeout;
+    }
+
     @Bean("triageChatClient")
     public ChatClient triageChatClient(
             ChatClient.Builder builder,
@@ -18,13 +32,15 @@ public class ChatClientConfiguration {
             // Empty means the model's own default; set it to compare speed and cost against quality in the eval
             @Value("${llm.triage.reasoning-effort:}") String reasoningEffort) {
 
-        builder
-                .defaultSystem(systemPromptResource)
-                .defaultAdvisors(new MetricsAdvisor("triage", costCalculator, llmMetrics));
+        OpenAiChatOptions.Builder options = options();
         if (!reasoningEffort.isBlank()) {
-            builder.defaultOptions(OpenAiChatOptions.builder().reasoningEffort(reasoningEffort));
+            options.reasoningEffort(reasoningEffort);
         }
-        return builder.build();
+        return builder
+                .defaultSystem(systemPromptResource)
+                .defaultAdvisors(new MetricsAdvisor("triage", costCalculator, llmMetrics))
+                .defaultOptions(options)
+                .build();
     }
 
     /**
@@ -43,7 +59,7 @@ public class ChatClientConfiguration {
         return builder
                 .defaultSystem(systemPromptResource)
                 .defaultAdvisors(new MetricsAdvisor("triage", costCalculator, llmMetrics))
-                .defaultOptions(OpenAiChatOptions.builder().model(llmProperties.fallback().model()))
+                .defaultOptions(options().model(llmProperties.fallback().model()))
                 .build();
     }
 
@@ -59,7 +75,11 @@ public class ChatClientConfiguration {
         return builder
                 .defaultSystem(systemPromptResource)
                 .defaultAdvisors(new MetricsAdvisor("draft", costCalculator, llmMetrics))
-                .defaultOptions(OpenAiChatOptions.builder().reasoningEffort("none"))
+                .defaultOptions(options().reasoningEffort("none"))
                 .build();
+    }
+
+    private OpenAiChatOptions.Builder options() {
+        return OpenAiChatOptions.builder().timeout(requestTimeout);
     }
 }

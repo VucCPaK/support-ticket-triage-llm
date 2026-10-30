@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 		<spring-ai.version>2.0.1</spring-ai.version>
+			<test.excluded.groups>live</test.excluded.groups>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -155,6 +156,8 @@
 				<artifactId>maven-surefire-plugin</artifactId>
 				<configuration>
 					<argLine>-Duser.timezone=UTC</argLine>
+					<!-- Tests tagged live call the real model and cost money: excluded unless asked for -->
+					<excludedGroups>${test.excluded.groups}</excludedGroups>
 				</configuration>
 			</plugin>
 			<plugin>
