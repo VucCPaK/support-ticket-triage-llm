@@ -42,3 +42,71 @@ jobs:
             ghcr.io/vuccpak/support-ticket-triage-llm:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # The tests check the code; this checks the package: the published image starts on a clean database
+  # with configuration from environment variables only, Flyway applies every migration, health is UP.
+  # No OpenAI key is needed: health does not call the model.
+  smoke:
+    needs: image
+    runs-on: ubuntu-latest
+    permissions:
+      packages: read
+    env:
+      IMAGE: ghcr.io/vuccpak/support-ticket-triage-llm:${{ github.sha }}
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: ticket_triage
+          POSTGRES_USER: ticket_triage
+          POSTGRES_PASSWORD: smoke-test-only
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ticket_triage"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Start the published image
+        # --network host: the app reaches the service container on localhost:5432, as it would a managed database
+        run: >-
+          docker run -d --name app --network host
+          -e SPRING_DATASOURCE_URL=jdbc:postgresql://localhost:5432/ticket_triage
+          -e SPRING_DATASOURCE_USERNAME=ticket_triage
+          -e SPRING_DATASOURCE_PASSWORD=smoke-test-only
+          -e OPENAI_API_KEY=not-used-by-the-smoke-test
+          "$IMAGE"
+      - name: Wait until health is UP
+        run: |
+          for attempt in $(seq 1 60); do
+            if curl -fs localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "Healthy after $((attempt * 2))s"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::The image did not become healthy within 120s"
+          exit 1
+      - name: Application log
+        if: always()
+        run: docker logs app
+
+  # No cloud is connected to this project (a cost decision). The job still goes through the production
+  # environment, so the manual approval works as it would before a real deploy, and it says what it would run.
+  deploy:
+    name: deploy (dry run)
+    needs: smoke
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - run: |
+          echo "::notice title=Dry run::No cloud is connected to this project; nothing was deployed."
+          echo "A real deploy would run:"
+          echo "  az containerapp update --name ticket-triage --resource-group rg-ticket-triage \\"
+          echo "    --image ghcr.io/vuccpak/support-ticket-triage-llm:${{ github.sha }}"
